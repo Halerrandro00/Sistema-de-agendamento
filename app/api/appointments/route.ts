@@ -119,8 +119,8 @@ export async function POST(request: NextRequest) {
       if (patient) {
         appointmentData.patient_id = patient.id
       } else {
-        // Garante que o usuário logado como paciente tenha um registro na tabela de pacientes
-        return NextResponse.json({ error: "Perfil de paciente não encontrado para este usuário." }, { status: 404 })
+        // Este erro indica que o processo de cadastro não criou um registro na tabela 'patients'.
+        return NextResponse.json({ error: "Perfil de paciente não encontrado. O cadastro do usuário pode estar incompleto." }, { status: 404 })
       }
     }
 

@@ -5,6 +5,7 @@ import { useEffect, useState } from "react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
 interface User {
@@ -14,26 +15,60 @@ interface User {
   user_type: "admin" | "doctor" | "patient"
 }
 
+interface Doctor {
+  id: string
+  specialty: string
+  crm: string
+  profiles: {
+    full_name: string
+    email: string
+    phone: string
+  }
+}
 interface Appointment {
   id: string
   appointment_date: string
   status: string
-  doctor: {
-    profiles: { full_name: string }
+  doctors: {
+    profiles: { full_name: string } | null
     specialty: string
-  }
-  patient: {
-    profiles: { full_name: string }
-  }
+  } | null
+  patients: { // A relação 'patients' pode ser nula
+    profiles: { full_name: string } | null // e o perfil dentro dela também
+  } | null
   notes?: string
 }
 
 export default function DashboardPage() {
   const [user, setUser] = useState<User | null>(null)
   const [appointments, setAppointments] = useState<Appointment[]>([])
+  const [doctors, setDoctors] = useState<Doctor[]>([])
   const [loading, setLoading] = useState(true)
   const [scheduleMessage, setScheduleMessage] = useState("")
   const router = useRouter()
+
+  const generateFakeSlots = () => {
+    const slots = []
+    const today = new Date()
+    for (let i = 1; i <= 5; i++) {
+      // Gera horários para os próximos 5 dias mocados...
+      const day = new Date(today)
+      day.setDate(today.getDate() + i)
+      const dayString = day.toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "2-digit" })
+
+      ;["09:00", "10:00", "11:00", "14:00", "15:00", "16:00"].forEach((time) => {
+        const [hour, minute] = time.split(":")
+        const slotDate = new Date(day.getFullYear(), day.getMonth(), day.getDate(), parseInt(hour), parseInt(minute))
+        slots.push({
+          value: slotDate.toISOString(), // esse aqui é o Valor enviado para a API
+          label: `${dayString} - ${time}`, // Texto exibido para o usuário logado...
+        })
+      })
+    }
+    return slots
+  }
+
+  const fakeAvailableSlots = generateFakeSlots()
 
   useEffect(() => {
     const fetchData = async () => {
@@ -42,17 +77,28 @@ export default function DashboardPage() {
       try {
         // 1. Buscar dados do usuário logado
         const userResponse = await fetch("/api/me")
-        if (!userResponse.ok) throw new Error("Falha ao buscar dados do usuário")
+        if (!userResponse.ok) {
+          throw new Error("Sessão inválida. Por favor, faça login novamente.")
+        }
         const userData = await userResponse.json()
         setUser(userData.user)
 
-        // 2. Buscar consultas
-        const response = await fetch("/api/appointments")
-        if (!response.ok) throw new Error("Falha ao buscar consultas")
-        const data = await response.json()
-        setAppointments(data.appointments || [])
+        // 2. Buscar consultas e médicos em paralelo
+        const [appointmentsRes, doctorsRes] = await Promise.all([fetch("/api/appointments"), fetch("/api/doctors")])
+
+        if (!appointmentsRes.ok) throw new Error("Falha ao buscar consultas")
+        const appointmentsData = await appointmentsRes.json()
+        setAppointments(appointmentsData.appointments || [])
+
+        if (!doctorsRes.ok) throw new Error("Falha ao buscar médicos")
+        const doctorsData = await doctorsRes.json()
+        setDoctors(doctorsData.doctors || [])
       } catch (error) {
-        console.error("Erro ao carregar consultas:", error)
+        console.error("Erro ao carregar dados do dashboard:", error)
+        // Se algo falhar (ex: sessão expirada), redireciona para o login
+        // A mensagem de erro não seria visível pois o usuário é redirecionado imediatamente.
+        // Apenas redirecionamos para a página de login.
+        router.push("/login")
       } finally {
         setLoading(false)
       }
@@ -94,7 +140,7 @@ export default function DashboardPage() {
       }
 
       setScheduleMessage("Consulta agendada com sucesso!")
-      // Opcional: recarregar a lista de consultas
+      // Opcional: recarregar a lista de consultas - função que vou ativar depois...
       // fetchData()
     } catch (error: any) {
       console.error("Erro no agendamento:", error)
@@ -188,7 +234,7 @@ export default function DashboardPage() {
                                 })}
                               </h3>
                               <p className="text-gray-600">
-                                Dr. {appointment.doctor.profiles.full_name} - {appointment.doctor.specialty}
+                                Dr. {appointment.doctors?.profiles?.full_name ?? "N/A"} - {appointment.doctors?.specialty ?? "N/A"}
                               </p>
                             </div>
                             <span
@@ -224,7 +270,24 @@ export default function DashboardPage() {
                 <CardDescription>Lista de médicos cadastrados no sistema</CardDescription>
               </CardHeader>
               <CardContent>
-                <p className="text-gray-500">Lista de médicos será carregada aqui.</p>
+                {doctors.length === 0 ? (
+                  <p className="text-gray-500">Nenhum médico encontrado.</p>
+                ) : (
+                  <div className="space-y-4">
+                    {doctors.map((doctor) => (
+                      <div key={doctor.id} className="border rounded-lg p-4 flex justify-between items-center">
+                        <div>
+                          <h3 className="font-semibold">{doctor.profiles.full_name}</h3>
+                          <p className="text-sm text-gray-600">{doctor.specialty}</p>
+                          <p className="text-xs text-gray-500">CRM: {doctor.crm}</p>
+                        </div>
+                        <Button variant="outline" size="sm" disabled>
+                          Ver Agenda
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
@@ -238,19 +301,38 @@ export default function DashboardPage() {
               <CardContent>
                 <form onSubmit={handleScheduleAppointment} className="space-y-4">
                   <div>
-                    <label htmlFor="doctor_id" className="block text-sm font-medium text-gray-700">
-                      ID do Médico
+                    <label htmlFor="doctor_id" className="block text-sm font-medium text-gray-700 mb-1">
+                      Médico
                     </label>
-                    <Input id="doctor_id" name="doctor_id" type="text" required placeholder="Insira o ID do médico" />
-                    <p className="text-xs text-gray-500 mt-1">
-                      (Em uma aplicação real, isso seria um seletor com a lista de médicos)
-                    </p>
+                    <Select name="doctor_id" required>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione um médico..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {doctors.map((doctor) => (
+                          <SelectItem key={doctor.id} value={doctor.id}>
+                            {doctor.profiles.full_name} - {doctor.specialty}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                   <div>
                     <label htmlFor="appointment_date" className="block text-sm font-medium text-gray-700">
                       Data e Hora
                     </label>
-                    <Input id="appointment_date" name="appointment_date" type="datetime-local" required />
+                    <Select name="appointment_date" required>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione um horário..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {fakeAvailableSlots.map((slot) => (
+                          <SelectItem key={slot.value} value={slot.value}>
+                            {slot.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                   <div>
                     <label htmlFor="notes" className="block text-sm font-medium text-gray-700">

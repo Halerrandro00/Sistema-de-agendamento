@@ -1,13 +1,14 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { createServerClient } from "@/lib/supabase"
 import { requirePermission } from "@/lib/permissions"
+import { cookies } from "next/headers"
 
 export async function POST(
   request: NextRequest,
   { params }: { params: { id: string } },
 ) {
   try {
-    const supabase = createServerClient()
+    const supabase = createServerClient(cookies())
     const {
       data: { user },
     } = await supabase.auth.getUser()
@@ -42,4 +43,3 @@ export async function POST(
     return NextResponse.json({ error: error.message || "Erro interno" }, { status: 500 })
   }
 }
-

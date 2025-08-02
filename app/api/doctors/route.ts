@@ -1,31 +1,25 @@
-import { type NextRequest, NextResponse } from "next/server"
+import { NextResponse } from "next/server"
 import { createServerClient } from "@/lib/supabase"
-import { requirePermission } from "@/lib/permissions"
+import { cookies } from "next/headers"
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
-    const supabase = createServerClient()
-
-    // Verificar autenticação
+    const supabase = createServerClient(cookies())
     const {
       data: { user },
     } = await supabase.auth.getUser()
+
     if (!user) {
       return NextResponse.json({ error: "Não autorizado" }, { status: 401 })
     }
 
-    // Buscar perfil do usuário
-    const { data: profile } = await supabase.from("profiles").select("user_type").eq("id", user.id).single()
-
-    if (!profile) {
-      return NextResponse.json({ error: "Perfil não encontrado" }, { status: 404 })
-    }
-
-    requirePermission(profile.user_type, "doctors", "read")
-
+    // Qualquer usuário autenticado pode ver a lista de médicos.
+    // A query busca em 'doctors' e junta com 'profiles' para pegar o nome.
     const { data: doctors, error } = await supabase.from("doctors").select(`
-        *,
-        profiles:user_id (
+        id,
+        specialty,
+        crm,
+        profiles (
           full_name,
           email,
           phone
@@ -33,16 +27,11 @@ export async function GET(request: NextRequest) {
       `)
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 400 })
+      throw error
     }
 
     return NextResponse.json({ doctors })
   } catch (error: any) {
-    return NextResponse.json(
-      {
-        error: error.message || "Erro interno do servidor",
-      },
-      { status: 500 },
-    )
+    return NextResponse.json({ error: error.message || "Erro interno do servidor" }, { status: 500 })
   }
 }

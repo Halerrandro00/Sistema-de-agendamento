@@ -21,12 +21,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
 function initializeApp() {
   // Verificar se há usuário logado
-  const token = localStorage.getItem("authToken")
-  if (token) {
-    loadUserProfile()
-  } else {
+  // A sessão é gerenciada por cookies do Supabase.
+  // Tentamos carregar o perfil, se falhar, o usuário é deslogado.
+  loadUserProfile().catch(() => {
     showLogin()
-  }
+  })
 }
 
 function setupEventListeners() {
@@ -47,6 +46,9 @@ function setupEventListeners() {
       doctorFields.style.display = "none"
     }
   })
+
+  // Máscara para o telefone
+  document.getElementById("registerPhone").addEventListener("input", applyPhoneMask)
 
   // Tabs
   document.querySelectorAll(".tab-button").forEach((button) => {
@@ -79,14 +81,22 @@ async function handleLogin(e) {
     const data = await response.json()
 
     if (response.ok) {
-      localStorage.setItem("authToken", data.session.access_token)
       await loadUserProfile()
       showSuccess("Login realizado com sucesso!")
     } else {
       showError(data.error || "Erro no login")
     }
   } catch (error) {
-    showError("Erro de conexão")
+// Em public/app.js
+function applyPhoneMask(e) {
+  let value = e.target.value.replace(/\D/g, "")
+  value = value.replace(/^(\d{2})(\d)/g, "($1) ")
+  value = value.replace(/(\d{5})(\d)/, "-")
+  value = value.replace(/(\d{4})-(\d)(\d{4})/, "-")
+  e.target.value = value.substring(0, 15) // Limita o tamanho
+}
+    console.error("Falha na requisição de login:", error)
+    showError("Erro de conexão. Verifique o console do navegador e o terminal do servidor para mais detalhes.")
   } finally {
     showLoading(false)
   }
@@ -140,29 +150,31 @@ function handleGoogleLogin() {
 }
 
 function handleLogout() {
-  localStorage.removeItem("authToken")
-  currentUser = null
-  currentUserType = null
-  showLogin()
-  showSuccess("Logout realizado com sucesso!")
+  fetch(`${API_BASE_URL}/auth/logout`, { method: "POST" })
+    .then(() => {
+      currentUser = null
+      currentUserType = null
+      showLogin()
+      showSuccess("Logout realizado com sucesso!")
+    })
+    .catch(() => showError("Erro ao fazer logout."))
 }
 
 async function loadUserProfile() {
   try {
-    // Simular carregamento do perfil do usuário
-    // Em uma implementação real, faria uma chamada para a API
-    currentUser = {
-      id: "1",
-      full_name: "Usuário Teste",
-      email: "teste@email.com",
-      user_type: "patient",
+    showLoading(true)
+    const response = await fetch(`${API_BASE_URL}/me`)
+    if (!response.ok) {
+      throw new Error("Sessão inválida ou expirada.")
     }
+    const data = await response.json()
+    currentUser = data.user
     currentUserType = currentUser.user_type
 
     showDashboard()
-    loadDashboardData()
+    await loadDashboardData()
   } catch (error) {
-    showError("Erro ao carregar perfil do usuário")
+    showError(error.message || "Erro ao carregar perfil do usuário")
     handleLogout()
   }
 }
@@ -201,30 +213,18 @@ async function loadDashboardData() {
 async function loadAppointments() {
   try {
     showLoading(true)
-
-    // Simular dados de consultas
-    const appointments = [
-      {
-        id: "1",
-        appointment_date: "2024-01-15T10:00:00Z",
-        status: "scheduled",
-        doctor: { profiles: { full_name: "Dr. João Silva" }, specialty: "Cardiologia" },
-        patient: { profiles: { full_name: "Maria Santos" } },
-        notes: "Consulta de rotina",
-      },
-      {
-        id: "2",
-        appointment_date: "2024-01-10T14:00:00Z",
-        status: "completed",
-        doctor: { profiles: { full_name: "Dra. Ana Costa" }, specialty: "Dermatologia" },
-        patient: { profiles: { full_name: "João Oliveira" } },
-        notes: "Avaliação de pele",
-      },
-    ]
-
-    displayAppointments(appointments)
+    const response = await fetch(`${API_BASE_URL}/appointments`)
+    if (!response.ok) {
+      const errorData = await response.json()
+      throw new Error(errorData.error || "Falha ao carregar consultas")
+    }
+    const data = await response.json()
+    // A API retorna um objeto com a chave 'appointments'
+    // O nome do paciente/médico está em `patients.profiles.full_name` ou `doctors.profiles.full_name`
+    displayAppointments(data.appointments || [])
   } catch (error) {
-    showError("Erro ao carregar consultas")
+    console.error(error)
+    showError(error.message || "Erro ao carregar consultas")
   } finally {
     showLoading(false)
   }
@@ -253,8 +253,8 @@ function displayAppointments(appointments) {
                     </div>
                 </div>
                 <div class="appointment-info">
-                    <div><strong>Médico:</strong> ${appointment.doctor.profiles.full_name}</div>
-                    <div><strong>Especialidade:</strong> ${appointment.doctor.specialty}</div>
+                    <div><strong>Médico:</strong> ${appointment.doctors.profiles.full_name}</div>
+                    <div><strong>Especialidade:</strong> ${appointment.doctors.specialty}</div>
                     ${currentUserType !== "patient" ? `<div><strong>Paciente:</strong> ${appointment.patient.profiles.full_name}</div>` : ""}
                     ${appointment.notes ? `<div><strong>Observações:</strong> ${appointment.notes}</div>` : ""}
                 </div>
@@ -280,34 +280,18 @@ function displayAppointments(appointments) {
 
 async function loadDoctors() {
   try {
-    // Simular dados de médicos
-    const doctors = [
-      {
-        id: "1",
-        specialty: "Cardiologia",
-        crm: "123456/SP",
-        profiles: {
-          full_name: "Dr. João Silva",
-          email: "joao@email.com",
-          phone: "(11) 99999-9999",
-        },
-      },
-      {
-        id: "2",
-        specialty: "Dermatologia",
-        crm: "654321/SP",
-        profiles: {
-          full_name: "Dra. Ana Costa",
-          email: "ana@email.com",
-          phone: "(11) 88888-8888",
-        },
-      },
-    ]
-
-    displayDoctors(doctors)
-    populateDoctorSelect(doctors)
+    const response = await fetch(`${API_BASE_URL}/doctors`)
+    if (!response.ok) {
+      const errorData = await response.json()
+      throw new Error(errorData.error || "Falha ao carregar médicos")
+    }
+    const data = await response.json()
+    // A API retorna um objeto com a chave 'doctors'
+    displayDoctors(data.doctors || [])
+    populateDoctorSelect(data.doctors || [])
   } catch (error) {
-    showError("Erro ao carregar médicos")
+    console.error(error)
+    showError(error.message || "Erro ao carregar médicos")
   }
 }
 
@@ -356,7 +340,6 @@ async function handleScheduleAppointment(e) {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${localStorage.getItem("authToken")}`,
       },
       body: JSON.stringify({
         doctor_id: doctorId,
@@ -394,7 +377,6 @@ async function cancelAppointment(appointmentId) {
       method: "PUT",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${localStorage.getItem("authToken")}`,
       },
       body: JSON.stringify({ status: "cancelled" }),
     })
@@ -469,6 +451,14 @@ function getStatusText(status) {
     rescheduled: "Reagendada",
   }
   return statusMap[status] || status
+}
+
+function applyPhoneMask(e) {
+  let value = e.target.value.replace(/\D/g, "")
+  value = value.replace(/^(\d{2})(\d)/g, "($1) $2")
+  value = value.replace(/(\d{5})(\d)/, "$1-$2")
+  value = value.replace(/(\d{4})-(\d)(\d{4})/, "$1$2-$3")
+  e.target.value = value.substring(0, 15) // Limita o tamanho
 }
 
 // Set minimum date for appointment scheduling
