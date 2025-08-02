@@ -62,40 +62,6 @@ Backend para uma clínica médica que permite marcação e gerenciamento de cons
 - **Row Level Security (RLS)** - Segurança a nível de linha
 - **Triggers e Functions** - Automação de timestamps
 
-## Estrutura do Projeto
-
-\`\`\`
-medical-appointment-system/
-├── app/
-│   ├── api/
-│   │   ├── auth/
-│   │   │   ├── login/route.ts
-│   │   │   └── register/route.ts
-│   │   ├── appointments/
-│   │   │   ├── route.ts
-│   │   │   └── [id]/route.ts
-│   │   └── doctors/route.ts
-│   └── layout.tsx
-├── lib/
-│   ├── supabase.ts
-│   ├── auth.ts
-│   ├── validation.ts
-│   └── permissions.ts
-├── public/
-│   ├── index.html
-│   ├── styles.css
-│   └── app.js
-├── scripts/
-│   └── database-setup.sql
-├── __tests__/
-│   ├── auth.test.js
-│   ├── appointments.test.js
-│   ├── validation.test.js
-│   └── permissions.test.js
-├── package.json
-├── jest.setup.js
-└── README.md
-\`\`\`
 
 ## Configuração e Instalação
 
@@ -233,32 +199,3 @@ npm run test:coverage
 
 ### Vercel (Recomendado)
 
-1. Conecte seu repositório GitHub ao Vercel
-2. Configure as variáveis de ambiente no painel do Vercel
-3. Deploy automático a cada push
-
-### Outras Plataformas
-
-- **Heroku**: Suporte nativo ao Node.js
-- **Railway**: Deploy simples com GitHub
-- **Netlify**: Para aplicações full-stack
-- **AWS/GCP/Azure**: Para deploy em cloud
-
-## Contribuição
-
-1. Fork o projeto
-2. Crie uma branch para sua feature (`git checkout -b feature/AmazingFeature`)
-3. Commit suas mudanças (`git commit -m 'Add some AmazingFeature'`)
-4. Push para a branch (`git push origin feature/AmazingFeature`)
-5. Abra um Pull Request
-
-## Licença
-
-Este projeto está sob a licença MIT. Veja o arquivo `LICENSE` para mais detalhes.
-
-## Contato
-
-- **Desenvolvedor 1**: [email1@exemplo.com]
-- **Desenvolvedor 2**: [email2@exemplo.com]
-- **Repositório**: [URL_DO_REPOSITORIO]
-- **Demo**: [URL_DA_DEMO]
