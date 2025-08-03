@@ -49,7 +49,7 @@ export default function DashboardPage() {
   const router = useRouter()
 
   const generateFakeSlots = () => {
-    const slots = []
+    const slots: { value: string; label: string }[] = []
     const today = new Date()
     for (let i = 1; i <= 5; i++) {
       // Gera horários para os próximos 5 dias mocados...
