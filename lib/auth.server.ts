@@ -1,32 +1,34 @@
-import { supabase } from "./supabase"
+"use client"
+
+import { createBrowserClient } from "./supabase";
+
+const supabase = createBrowserClient();
 
 export interface User {
-  id: string
-  email: string
-  full_name: string
-  user_type: "admin" | "doctor" | "patient"
-  phone?: string
+  id: string;
+  email: string;
+  full_name: string;
+  user_type: "admin" | "doctor" | "patient";
+  phone?: string;
 }
 
 export const authService = {
-  // Autenticação por email/senha
   async signInWithEmail(email: string, password: string) {
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
-    })
-    return { data, error }
+    });
+    return { data, error };
   },
 
-  // Autenticação OAuth (Google)
   async signInWithGoogle() {
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
         redirectTo: `${window.location.origin}/auth/callback`,
       },
-    })
-    return { data, error }
+    });
+    return { data, error };
   },
 
   async signUp(email: string, password: string, userData: Partial<User>) {
@@ -36,23 +38,27 @@ export const authService = {
       options: {
         data: userData,
       },
-    })
-    return { data, error }
+    });
+    return { data, error };
   },
 
   async signOut() {
-    const { error } = await supabase.auth.signOut()
-    return { error }
+    const { error } = await supabase.auth.signOut();
+    return { error };
   },
 
   async getCurrentUser() {
     const {
       data: { user },
-    } = await supabase.auth.getUser()
-    if (!user) return null
+    } = await supabase.auth.getUser();
+    if (!user) return null;
 
-    const { data: profile } = await supabase.from("profiles").select("*").eq("id", user.id).single()
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("*")
+      .eq("id", user.id)
+      .single();
 
-    return profile
+    return profile;
   },
-}
+};

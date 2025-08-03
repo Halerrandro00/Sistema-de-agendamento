@@ -1,5 +1,5 @@
 import { type CookieOptions, createServerClient as _createServerClient } from "@supabase/ssr"
-import { createClient } from "@supabase/supabase-js"
+import { createBrowserClient as _createBrowserClient, createClient } from "@supabase/supabase-js"
 import { cookies } from "next/headers"
 
 /**
@@ -35,6 +35,15 @@ export const createServerClient = (cookieStore: ReturnType<typeof cookies>) => {
 }
 
 /**
+ * Cria um cliente Supabase para uso em Componentes do Cliente (navegador).
+ */
+export const createBrowserClient = () =>
+  _createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+  )
+
+/**
  * Cria um cliente Supabase com privilégios de administrador para uso
  * em rotas de API seguras.
  */
@@ -50,4 +59,3 @@ export const createAdminClient = () => {
     },
   )
 }
-
