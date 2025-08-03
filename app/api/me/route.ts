@@ -1,32 +1,23 @@
-import { NextResponse } from "next/server"
 import { createServerClient } from "@/lib/supabase"
 import { cookies } from "next/headers"
+import { NextResponse } from "next/server"
 
-export async function GET() {
+export async function GET(request: Request) {
+  const cookieStore = cookies()
+  const supabase = createServerClient(cookieStore)
+
   try {
-    const supabase = createServerClient(cookies())
     const {
       data: { user },
-      error: authError,
+      error,
     } = await supabase.auth.getUser()
 
-    if (authError || !user) {
-      return NextResponse.json({ error: "Não autorizado" }, { status: 401 })
+    if (error || !user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    // Agora, buscamos o perfil correspondente na sua tabela `profiles`
-    const { data: profile, error: profileError } = await supabase
-      .from("profiles")
-      .select("*")
-      .eq("id", user.id)
-      .single()
-
-    if (profileError || !profile) {
-      return NextResponse.json({ error: "Perfil não encontrado" }, { status: 404 })
-    }
-
-    return NextResponse.json({ user: profile })
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message || "Erro interno do servidor" }, { status: 500 })
+    return NextResponse.json({ user })
+  } catch (e) {
+    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 })
   }
 }

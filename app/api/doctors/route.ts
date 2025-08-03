@@ -27,11 +27,16 @@ export async function GET() {
       `)
 
     if (error) {
-      throw error
+      console.error("Supabase error fetching doctors:", error.message)
+      return NextResponse.json({ error: "Erro de banco de dados ao buscar médicos." }, { status: 500 })
     }
 
     return NextResponse.json({ doctors })
   } catch (error: any) {
-    return NextResponse.json({ error: error.message || "Erro interno do servidor" }, { status: 500 })
+    console.error("Internal server error in /api/doctors:", error)
+    return NextResponse.json(
+      { error: error.message || "Erro interno do servidor" },
+      { status: 500 },
+    )
   }
 }

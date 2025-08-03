@@ -88,25 +88,27 @@ ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
 -- Limpa políticas antigas para garantir que o script possa ser executado novamente
 DROP POLICY IF EXISTS "Users can view own profile" ON profiles;
 DROP POLICY IF EXISTS "Users can update own profile" ON profiles;
+DROP POLICY IF EXISTS "Users can view doctor profiles" ON profiles;
 DROP POLICY IF EXISTS "Admins can view all profiles" ON profiles;
-DROP POLICY IF EXISTS "Doctors can view own data" ON doctors;
+DROP POLICY IF EXISTS "Authenticated users can view doctors" ON doctors;
 DROP POLICY IF EXISTS "Patients can view own data" ON patients;
 DROP POLICY IF EXISTS "Users can view related appointments" ON appointments;
+DROP POLICY IF EXISTS "Patients can create appointments" ON appointments;
 DROP POLICY IF EXISTS "Users can view their own notifications" ON notifications;
 DROP POLICY IF EXISTS "Users can update their own notifications" ON notifications;
 
 -- Políticas para profiles
 CREATE POLICY "Users can view own profile" ON profiles FOR SELECT USING (auth.uid() = id);
 CREATE POLICY "Users can update own profile" ON profiles FOR UPDATE USING (auth.uid() = id);
+-- Permite que usuários autenticados vejam os perfis dos médicos (necessário para a lista de médicos)
+CREATE POLICY "Users can view doctor profiles" ON profiles FOR SELECT TO authenticated USING (user_type = 'doctor');
 CREATE POLICY "Admins can view all profiles" ON profiles FOR SELECT USING (
   EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND user_type = 'admin')
 );
 
 -- Políticas para doctors
-CREATE POLICY "Doctors can view own data" ON doctors FOR SELECT USING (
-  user_id = auth.uid() OR 
-  EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND user_type = 'admin')
-);
+-- Permite que qualquer usuário autenticado veja a lista de médicos.
+CREATE POLICY "Authenticated users can view doctors" ON doctors FOR SELECT TO authenticated USING (true);
 
 -- Políticas para patients
 CREATE POLICY "Patients can view own data" ON patients FOR SELECT USING (
@@ -124,6 +126,13 @@ CREATE POLICY "Users can view related appointments" ON appointments FOR SELECT U
   ) OR
   EXISTS (
     SELECT 1 FROM profiles WHERE id = auth.uid() AND user_type = 'admin'
+  )
+);
+
+-- Permite que pacientes criem suas próprias consultas
+CREATE POLICY "Patients can create appointments" ON appointments FOR INSERT WITH CHECK (
+  EXISTS (
+    SELECT 1 FROM patients p WHERE p.id = patient_id AND p.user_id = auth.uid()
   )
 );
 

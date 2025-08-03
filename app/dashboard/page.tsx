@@ -1,7 +1,7 @@
 "use client"
 
 import { useRouter } from "next/navigation"
-import { useEffect, useState } from "react"
+import { useEffect, useState, useCallback } from "react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -44,6 +44,7 @@ export default function DashboardPage() {
   const [appointments, setAppointments] = useState<Appointment[]>([])
   const [doctors, setDoctors] = useState<Doctor[]>([])
   const [loading, setLoading] = useState(true)
+  const [dashboardError, setDashboardError] = useState<string | null>(null)
   const [scheduleMessage, setScheduleMessage] = useState("")
   const router = useRouter()
 
@@ -70,13 +71,17 @@ export default function DashboardPage() {
 
   const fakeAvailableSlots = generateFakeSlots()
 
-  useEffect(() => {
-    const fetchData = async () => {
+  const fetchData = useCallback(async () => {
       setLoading(true)
+      setDashboardError(null)
 
       try {
         // 1. Buscar dados do usuário logado
         const userResponse = await fetch("/api/me")
+        if (userResponse.status === 401) {
+          router.push("/login")
+          return
+        }
         if (!userResponse.ok) {
           throw new Error("Sessão inválida. Por favor, faça login novamente.")
         }
@@ -86,25 +91,31 @@ export default function DashboardPage() {
         // 2. Buscar consultas e médicos em paralelo
         const [appointmentsRes, doctorsRes] = await Promise.all([fetch("/api/appointments"), fetch("/api/doctors")])
 
-        if (!appointmentsRes.ok) throw new Error("Falha ao buscar consultas")
+        if (!appointmentsRes.ok) {
+          const errorData = await appointmentsRes.json().catch(() => ({}))
+          throw new Error(errorData.error || "Falha ao buscar consultas")
+        }
         const appointmentsData = await appointmentsRes.json()
         setAppointments(appointmentsData.appointments || [])
 
-        if (!doctorsRes.ok) throw new Error("Falha ao buscar médicos")
+        if (!doctorsRes.ok) {
+          const errorData = await doctorsRes.json().catch(() => ({}))
+          throw new Error(errorData.error || "Falha ao buscar médicos")
+        }
         const doctorsData = await doctorsRes.json()
         setDoctors(doctorsData.doctors || [])
-      } catch (error) {
+      } catch (error: any) {
         console.error("Erro ao carregar dados do dashboard:", error)
-        // Se algo falhar (ex: sessão expirada), redireciona para o login
-        // A mensagem de erro não seria visível pois o usuário é redirecionado imediatamente.
-        // Apenas redirecionamos para a página de login.
-        router.push("/login")
+        // Define uma mensagem de erro para ser exibida na UI, em vez de redirecionar
+        setDashboardError(error.message || "Ocorreu um erro inesperado. Tente novamente mais tarde.")
       } finally {
         setLoading(false)
       }
-    }
+  }, [router])
+
+  useEffect(() => {
     fetchData()
-  }, [])
+  }, [fetchData])
 
   const handleLogout = async () => {
     try {
@@ -140,8 +151,8 @@ export default function DashboardPage() {
       }
 
       setScheduleMessage("Consulta agendada com sucesso!")
-      // Opcional: recarregar a lista de consultas - função que vou ativar depois...
-      // fetchData()
+      // Recarrega a lista de consultas para exibir o novo agendamento
+      await fetchData()
     } catch (error: any) {
       console.error("Erro no agendamento:", error)
       setScheduleMessage(error.message)
@@ -202,6 +213,16 @@ export default function DashboardPage() {
       </header>
 
       <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+        {dashboardError && (
+          <Card className="mb-4 bg-red-50 border-red-200">
+            <CardContent className="p-4">
+              <div className="flex items-center">
+                <p className="text-sm font-medium text-red-800">{dashboardError}</p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         <Tabs defaultValue="appointments" className="space-y-4">
           <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="appointments">Consultas</TabsTrigger>
