@@ -1,6 +1,6 @@
 # Sistema de Agendamento Médico
 
-**Dupla:** [Nome da Dupla]  
+**Dupla:** 
 **Projeto:** Sistema de Agendamento Médico  
 **Tecnologias:** Node.js, Next.js, Supabase, HTML, CSS, JavaScript, Jest
 
